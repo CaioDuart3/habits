@@ -1,19 +1,16 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:latest
-    container_name: postgres_container
-    env_file:
-      - ./backend/.env
+    container_name: postgres
     environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}        
+      POSTGRES_PASSWORD: ${DB_PASSWORD} 
+      POSTGRES_DB: ${DB_NAME}          
     ports:
       - "${DB_PORT}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
+      - ./backend/src/config/init.sql:/docker-entrypoint-initdb.d/init.sql
 
 volumes:
   postgres_data:

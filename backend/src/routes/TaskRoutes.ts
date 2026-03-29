@@ -11,3 +11,5 @@ const controller = new TaskController(service)
 
 router.get("/tasks", controller.index.bind(controller))
 router.post("/tasks", controller.create.bind(controller))
+
+export default router
