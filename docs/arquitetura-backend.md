@@ -1,62 +1,200 @@
-# 🏛️ Arquitetura Backend (Servidor): 
+
+# 🏛️ Arquitetura Backend (Servidor)
 
 Este documento descreve a organização e a estrutura de pastas do projeto, baseada em uma arquitetura de **responsabilidade única** e **separação de preocupações**.
 
 ## 📂 Estrutura de Pastas
 
-Abaixo está a representação visual do diretório principal `src/`, onde reside todo o código-fonte:
+Representação do diretório principal `src/`, onde reside todo o código-fonte da aplicação:
 
 ```
+
 src/
-├── models/           # Definição das estruturas de dados (Classes/Interfaces)
-├── repositories/     # Persistência e manipulação direta dos dados
-├── controllers/      # Lógica de controle e tratamento de Requisição/Resposta
-├── routers/          # Definição das rotas e verbos HTTP (GET, POST, etc.)
-├── app.ts            # Configuração central e middlewares (Espinha Dorsal)
-└── server.ts         # Inicialização do servidor (Motor de arranque)
+├── config/           # Configurações gerais (banco, variáveis de ambiente, etc.)
+├── models/           # Definição das entidades e tipos da aplicação
+├── repositories/     # Camada de acesso e persistência de dados
+├── services/         # Regras de negócio da aplicação
+├── controllers/      # Manipulação de requisição e resposta HTTP
+├── routers/          # Definição das rotas e associação com controllers
+├── app.ts            # Configuração da aplicação e middlewares globais
+└── server.ts         # Inicialização do servidor HTTP
+
 ```
 
 ---
 
 ## 🏗️ Camadas da Arquitetura
 
-A aplicação segue um fluxo de dados unidirecional para garantir que o código seja testável e fácil de manter.
+A aplicação segue um fluxo de dados **unidirecional**, garantindo organização, testabilidade e facilidade de manutenção.
 
-### 1. 🚦 Routers (Roteamento)
-É a primeira porta de entrada. O roteador olha para a URL e para o método HTTP (GET, POST, etc.) e decide qual **Controller** deve assumir a tarefa. Ele não executa lógica, apenas direciona o tráfego.
+### 🚦 Routers (Roteamento)
 
-### 2. 🎮 Controllers (Controladores)
-Atuam como intermediários entre o mundo externo (HTTP) e a lógica interna.
-* Extraem dados de `req.params`, `req.query` e `req.body`.
-* Validam informações básicas.
-* Chamam as funções do **Repository**.
-* Retornam a resposta final (`res.status().json()`) para o cliente.
+Responsáveis por mapear **rotas HTTP** para os controllers correspondentes.
 
-### 3. 📦 Repositories (Repositórios)
-É a camada que "conhece" onde os dados estão guardados (seja em um Array na memória, PostgreSQL, MongoDB, etc.). 
-* Contém a lógica de busca, inserção, atualização e exclusão.
-* Retorna sempre **Promises**, simulando o comportamento de um banco de dados real.
+Funções principais:
 
-### 4. 💎 Models (Modelos)
-Define o "formato" dos objetos da aplicação. No TypeScript, usamos classes ou interfaces para garantir que um `Customer`, por exemplo, sempre tenha um `id`, `name` e `cpf`.
+- Definir endpoints da API.
+- Associar métodos HTTP (`GET`, `POST`, `PUT`, `DELETE`) aos controllers.
+- Encaminhar a requisição sem executar lógica de negócio.
 
-### 5. 🦴 app.ts (Aplicaçâo)
-É o coração da API. Aqui são configurados os middlewares globais:
-* `express.json()`: Para ler JSON.
-* `morgan()`: Para logs de monitoramento.
-* `helmet()` & `cors()`: Para segurança e acessos.
-* Tratamento global de erros.
+Exemplo:
 
-### 6. ⚡ server.ts (Servidor)
-Responsável por carregar as variáveis de ambiente (`dotenv`) e colocar o servidor "de pé" em uma porta específica (ex: 3000).
+```ts
+router.post("/tasks", controller.create)
+````
 
 ---
 
+### 🎮 Controllers (Controladores)
 
+Intermediários entre a camada HTTP e a lógica da aplicação.
 
-## 🛠️ Tecnologias Principais
-* **Node.js**: Ambiente de execução.
-* **TypeScript**: Tipagem estática para maior segurança no desenvolvimento.
-* **Express**: Framework para abstração de rotas e middlewares.
-* **Nodemom/TS-Node**: Ferramentas para produtividade em desenvolvimento.
+Responsabilidades:
+
+* Receber e interpretar requisições.
+* Extrair dados de:
+
+  * `req.params`
+  * `req.query`
+  * `req.body`
+* Chamar os **services** responsáveis pela lógica de negócio.
+* Retornar a resposta HTTP adequada (`res.status().json()`).
+
+Exemplo de fluxo dentro de um controller:
+
+```ts
+const { title } = req.body
+const task = await service.createTask(title)
+return res.status(201).json(task)
 ```
+
+---
+
+### 🧠 Services (Regras de Negócio)
+
+Contêm a **lógica central da aplicação**.
+
+Responsabilidades:
+
+* Validar dados recebidos.
+* Aplicar regras de negócio.
+* Coordenar operações envolvendo múltiplos repositórios.
+* Delegar operações de persistência para os **repositories**.
+
+Essa camada evita que regras de negócio fiquem espalhadas nos controllers.
+
+---
+
+### 📦 Repositories (Repositórios)
+
+Responsáveis pelo **acesso e manipulação de dados**.
+
+Funções principais:
+
+* Buscar registros
+* Criar registros
+* Atualizar registros
+* Remover registros
+
+A camada de repository abstrai a origem dos dados, permitindo trocar facilmente o mecanismo de persistência (ex: memória → PostgreSQL).
+
+Exemplo de métodos comuns:
+
+```
+findAll()
+findById(id)
+create(data)
+update(id, data)
+delete(id)
+```
+
+Todos os métodos retornam **Promises**, simulando o comportamento de acesso a banco de dados.
+
+---
+
+### 💎 Models (Modelos)
+
+Definem as **entidades da aplicação** e a estrutura dos dados.
+
+No TypeScript, geralmente são representadas por:
+
+* `interface`
+* `type`
+* `class`
+
+Exemplo:
+
+```ts
+export interface Task {
+  id: number
+  title: string
+  description: string
+  status: string
+  createdAt: Date
+  updatedAt: Date
+}
+```
+
+Esses modelos garantem **tipagem consistente** em toda a aplicação.
+
+---
+
+### 🦴 app.ts (Aplicação)
+
+Arquivo responsável pela **configuração central da aplicação Express**.
+
+Configurações comuns:
+
+* Middlewares globais
+* Configuração de rotas
+* Segurança e logging
+* Tratamento global de erros
+
+Exemplo de middlewares:
+
+* `express.json()` → parsing de JSON
+* `morgan()` → logs de requisições
+* `helmet()` → segurança HTTP
+* `cors()` → controle de acesso entre origens
+
+---
+
+### ⚡ server.ts (Servidor)
+
+Responsável por **inicializar o servidor HTTP**.
+
+Funções principais:
+
+* Carregar variáveis de ambiente (`dotenv`)
+* Definir a porta da aplicação
+* Iniciar o servidor Express
+
+Exemplo:
+
+```ts
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`)
+})
+```
+
+---
+
+## 🔄 Fluxo da Aplicação
+
+```
+HTTP Request
+     ↓
+Router
+     ↓
+Controller
+     ↓
+Service
+     ↓
+Repository
+     ↓
+Database
+```
+
+Cada camada possui uma responsabilidade clara, garantindo uma arquitetura modular e escalável.
+
+
