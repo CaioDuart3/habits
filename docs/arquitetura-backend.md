@@ -1,200 +1,145 @@
 
 # 🏛️ Arquitetura Backend (Servidor)
 
-Este documento descreve a organização e a estrutura de pastas do projeto, baseada em uma arquitetura de **responsabilidade única** e **separação de preocupações**.
+Este documento descreve a organização do backend do projeto `to_do_list` e como cada camada se conecta.
 
 ## 📂 Estrutura de Pastas
 
-Representação do diretório principal `src/`, onde reside todo o código-fonte da aplicação:
+O backend é implementado em `backend/src/` com a seguinte estrutura:
 
 ```
-
 src/
-├── config/           # Configurações gerais (banco, variáveis de ambiente, etc.)
-├── models/           # Definição das entidades e tipos da aplicação
-├── repositories/     # Camada de acesso e persistência de dados
-├── services/         # Regras de negócio da aplicação
-├── controllers/      # Manipulação de requisição e resposta HTTP
-├── routers/          # Definição das rotas e associação com controllers
-├── app.ts            # Configuração da aplicação e middlewares globais
-└── server.ts         # Inicialização do servidor HTTP
-
+├── config/           # Configurações de ambiente e conexão com PostgreSQL
+├── controllers/      # Recebe requisições HTTP e envia respostas
+├── models/           # Definições de tipos e interfaces do domínio
+├── repositories/     # Consultas SQL e persistência de dados
+├── routes/           # Definição de endpoints e injeção de dependências
+├── services/         # Regras de negócio e validações
+├── app.ts            # Configuração do Express e middlewares
+└── server.ts         # Inicializa o servidor HTTP
 ```
 
 ---
 
 ## 🏗️ Camadas da Arquitetura
 
-A aplicação segue um fluxo de dados **unidirecional**, garantindo organização, testabilidade e facilidade de manutenção.
+O backend segue uma arquitetura de responsabilidade única, com fluxo unidirecional:
 
-### 🚦 Routers (Roteamento)
+1. `routes`
+2. `controllers`
+3. `services`
+4. `repositories`
+5. `database`
 
-Responsáveis por mapear **rotas HTTP** para os controllers correspondentes.
+### 🚦 Rotas
 
-Funções principais:
+O arquivo `backend/src/routes/TaskRoutes.ts` cria o roteamento:
 
-- Definir endpoints da API.
-- Associar métodos HTTP (`GET`, `POST`, `PUT`, `DELETE`) aos controllers.
-- Encaminhar a requisição sem executar lógica de negócio.
+- `GET /tasks` → lista todas as tarefas
+- `POST /tasks` → cria uma nova tarefa
 
-Exemplo:
+A rota injeta as dependências necessárias para `TaskController`.
 
-```ts
-router.post("/tasks", controller.create)
-````
+### 🎮 Controllers
 
----
+`TaskController` trata a lógica de HTTP:
 
-### 🎮 Controllers (Controladores)
+- extrai dados de `req.body`
+- valida os campos obrigatórios
+- chama o `TaskService`
+- retorna o resultado com status HTTP apropriado
 
-Intermediários entre a camada HTTP e a lógica da aplicação.
+Validações atuais em `create`:
 
-Responsabilidades:
+- `title`: string não vazia
+- `description`: string não vazia
+- `status`: deve ser `pending`, `in-progress` ou `completed`
 
-* Receber e interpretar requisições.
-* Extrair dados de:
+### 🧠 Services
 
-  * `req.params`
-  * `req.query`
-  * `req.body`
-* Chamar os **services** responsáveis pela lógica de negócio.
-* Retornar a resposta HTTP adequada (`res.status().json()`).
+`TaskService` contém a lógica de domínio e delega a persistência ao repositório.
 
-Exemplo de fluxo dentro de um controller:
+Funções implementadas:
 
-```ts
-const { title } = req.body
-const task = await service.createTask(title)
-return res.status(201).json(task)
-```
+- `getAllTasks()`
+- `getTask(id)`
+- `createTask(task)`
+- `deleteTask(id)`
 
----
+### 📦 Repositories
 
-### 🧠 Services (Regras de Negócio)
+`TaskRepository` usa `pg` para executar SQL no PostgreSQL.
 
-Contêm a **lógica central da aplicação**.
+Métodos:
 
-Responsabilidades:
+- `findAll()`
+- `findById(id)`
+- `create(task)`
+- `update(task)`
+- `deleteById(id)`
 
-* Validar dados recebidos.
-* Aplicar regras de negócio.
-* Coordenar operações envolvendo múltiplos repositórios.
-* Delegar operações de persistência para os **repositories**.
+A consulta SQL para criação usa `RETURNING *`, retornando o registro completo após inserção.
 
-Essa camada evita que regras de negócio fiquem espalhadas nos controllers.
+### 💎 Modelos
 
----
-
-### 📦 Repositories (Repositórios)
-
-Responsáveis pelo **acesso e manipulação de dados**.
-
-Funções principais:
-
-* Buscar registros
-* Criar registros
-* Atualizar registros
-* Remover registros
-
-A camada de repository abstrai a origem dos dados, permitindo trocar facilmente o mecanismo de persistência (ex: memória → PostgreSQL).
-
-Exemplo de métodos comuns:
-
-```
-findAll()
-findById(id)
-create(data)
-update(id, data)
-delete(id)
-```
-
-Todos os métodos retornam **Promises**, simulando o comportamento de acesso a banco de dados.
-
----
-
-### 💎 Models (Modelos)
-
-Definem as **entidades da aplicação** e a estrutura dos dados.
-
-No TypeScript, geralmente são representadas por:
-
-* `interface`
-* `type`
-* `class`
-
-Exemplo:
+`backend/src/models/Task.ts` define a interface `Task`:
 
 ```ts
 export interface Task {
   id: number
   title: string
   description: string
-  status: string
+  status: 'pending' | 'in-progress' | 'completed'
   createdAt: Date
   updatedAt: Date
 }
 ```
 
-Esses modelos garantem **tipagem consistente** em toda a aplicação.
+Essa tipagem é usada no serviço e no repositório para garantir consistência.
 
 ---
 
-### 🦴 app.ts (Aplicação)
+## 🔧 Conexão com o Banco de Dados
 
-Arquivo responsável pela **configuração central da aplicação Express**.
+`backend/src/config/postgres.ts` configura a conexão via `pg.Pool` usando variáveis de ambiente:
 
-Configurações comuns:
+- `DB_USER`
+- `DB_PASSWORD`
+- `DB_NAME`
+- `DB_HOST`
+- `DB_PORT`
 
-* Middlewares globais
-* Configuração de rotas
-* Segurança e logging
-* Tratamento global de erros
-
-Exemplo de middlewares:
-
-* `express.json()` → parsing de JSON
-* `morgan()` → logs de requisições
-* `helmet()` → segurança HTTP
-* `cors()` → controle de acesso entre origens
+O `docker-compose.yml` inicializa o serviço `postgres` e executa `backend/src/config/init.sql` para criar a tabela `tasks`.
 
 ---
 
-### ⚡ server.ts (Servidor)
+## 🧩 Fluxo de Requisição
 
-Responsável por **inicializar o servidor HTTP**.
-
-Funções principais:
-
-* Carregar variáveis de ambiente (`dotenv`)
-* Definir a porta da aplicação
-* Iniciar o servidor Express
-
-Exemplo:
-
-```ts
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`)
-})
+```text
+HTTP Request → Route → Controller → Service → Repository → PostgreSQL
 ```
+
+### `backend/src/app.ts`
+
+Ele registra os middlewares:
+
+- `morgan('tiny')`
+- `cors()`
+- `helmet()`
+- `express.json()`
+- rotas de tarefas
+- middleware global de tratamento de erro
+
+### `backend/src/server.ts`
+
+Carrega as variáveis de ambiente com `dotenv` e inicia o servidor na porta `PORT` ou `3000`.
 
 ---
 
-## 🔄 Fluxo da Aplicação
+## 📌 Observações importantes
 
-```
-HTTP Request
-     ↓
-Router
-     ↓
-Controller
-     ↓
-Service
-     ↓
-Repository
-     ↓
-Database
-```
-
-Cada camada possui uma responsabilidade clara, garantindo uma arquitetura modular e escalável.
+- O backend está escrito em TypeScript e usa `type: module`.
+- A resposta de banco de dados retorna colunas em `snake_case` (`created_at`, `updated_at`) porque o SQL é escrito assim.
+- A API atual não expõe rota de atualização ou remoção de tarefas ao frontend.
 
 
