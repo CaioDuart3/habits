@@ -1,16 +1,16 @@
-import type { Request, Response } from "express"
-import { TaskService } from "../services/TaskService.js"
-import type {Task } from "../models/Task.js"
+const { TaskService } = require("../services/TaskService");
 
-export class TaskController {
-  constructor(private service: TaskService) {}
+class TaskController {
+  constructor(service) {
+    this.service = service;
+  }
 
-  async index(req: Request, res: Response) {
+  async index(req, res) {
     const tasks = await this.service.getAllTasks()
     return res.json(tasks)
   }
 
-  async create(req: Request, res: Response) {
+  async create(req, res) {
     const { title, description, status } = req.body
 
     // Validação de dados
@@ -27,7 +27,7 @@ export class TaskController {
       return res.status(400).json({ error: "status deve ser: pending, in-progress ou completed" })
     }
 
-    const task: Omit<Task, "id"> = {
+    const task = {
       title: title.trim(),
       description: description.trim(),
       status,
@@ -40,3 +40,5 @@ export class TaskController {
     return res.status(201).json(newTask)
   }
 }
+
+module.exports = { TaskController };
